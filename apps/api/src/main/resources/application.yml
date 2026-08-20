@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: api
+
+  datasource:
+    # `db` is the compose service name, never localhost. Inside a container
+    # localhost is that container, and this one runs no database.
+    #
+    # encrypt=false is the SQL Server trap. The 12.x JDBC driver flipped the
+    # default to encrypt=true and the dev server's certificate is self-signed,
+    # so the default fails with "PKIX path building failed". Development only.
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://db:1433;databaseName=mvp;encrypt=false}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:Local_Dev_Pass123}
+
+  jpa:
+    # Flyway owns the schema; Hibernate only checks that its mappings agree
+    # with what the migrations built. `update` here would give the schema two
+    # owners and let drift accumulate silently until production, where
+    # migrations are the only mechanism that exists.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      # Pinned rather than left to auto-detection. Auto-detection works, but it
+      # costs a round trip at boot and produces a confusing error if the first
+      # connection is refused -- "unable to determine Dialect" instead of
+      # "connection refused".
+      hibernate.dialect: org.hibernate.dialect.SQLServerDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # SQL Server's default schema. Naming it explicitly means the migration
+    # history lands in a predictable place regardless of the login's default.
+    schemas: dbo
+
+  devtools:
+    restart:
+      enabled: true
+      # The bind mount surfaces host file events as a burst rather than one
+      # change, and the default 400ms window lets a restart fire mid-compile.
+      poll-interval: 2s
+      quiet-period: 1s
+
+server:
+  port: 8080
+  # Bind every interface. The default is fine on a host and wrong in a
+  # container: bound to loopback, the published port forwards to nothing and
+  # curl from the host hangs with no log line to explain it.
+  address: 0.0.0.0
+
+app:
+  web-origin: ${APP_WEB_ORIGIN:http://localhost:5173}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    org.springframework.jdbc.datasource.init: DEBUG

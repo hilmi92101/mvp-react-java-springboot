@@ -1,0 +1,24 @@
+# Nothing here is under version control yet -- this file is ready for the day
+# `git init` happens, so the first commit does not sweep in build output.
+
+# Secrets and machine-local overrides. .env.example is committed; .env is not.
+.env
+
+# Node
+node_modules/
+dist/
+*.log
+
+# Gradle / Java
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Editors and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Internal notes and plans. Kept local, not published to the remote.
+docs/

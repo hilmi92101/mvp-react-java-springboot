@@ -1,0 +1,164 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mvp_db
+    ports:
+      - "${DB_PORT:-1433}:1433"
+    environment:
+      # Both are required. Without ACCEPT_EULA the container prints the licence
+      # text and exits 1, which looks like a crash loop.
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}
+      # Developer edition: Enterprise feature set, licensed for non-production.
+      # `Express` is the other free option and caps at 1410MB RAM and 10GB per
+      # database -- fine until it silently is not.
+      MSSQL_PID: Developer
+    volumes:
+      - db_data:/var/opt/mssql
+    healthcheck:
+      # Probes with a real login, not a port check. SQL Server accepts TCP
+      # before it accepts logins, and a port check passes during that window --
+      # which is exactly when db-init would run and fail.
+      test:
+        - CMD-SHELL
+        - >-
+          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa
+          -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      # SQL Server's own startup is ~15-25s. Without this, the retry budget is
+      # spent before the server is ever ready and compose declares it unhealthy.
+      start_period: 60s
+    # SQL Server needs ~2GB and will refuse to start below it, so this is a
+    # floor rather than a tuning knob. Budget it alongside API_MEM_LIMIT: the
+    # two together are the real cost of this stack on a laptop.
+    mem_limit: ${DB_MEM_LIMIT:-2g}
+    restart: unless-stopped
+
+  # One-shot: creates the `mvp` database, then exits 0.
+  #
+  # SQL Server has no POSTGRES_DB equivalent -- MSSQL_SA_PASSWORD creates a
+  # login and nothing else, so a fresh volume has no application database and
+  # Flyway's first connection fails with "Cannot open database". infra/db/init.sh
+  # has the full explanation.
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mvp_db_init
+    entrypoint: ["/init/init.sh"]
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}
+      MSSQL_DB: ${MSSQL_DB:-mvp}
+      MSSQL_HOST: db
+    volumes:
+      - ./infra/db:/init:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # Never restart. A one-shot that exits 0 under `unless-stopped` is a
+    # restart loop, and compose would keep re-running it forever.
+    restart: "no"
+
+  # Adminer, which the Postgres version of this stack used, has no SQL Server
+  # driver -- it speaks MySQL, Postgres, SQLite, MS SQL only via a PDO
+  # extension it does not ship, Oracle and Elastic. CloudBeaver does speak it.
+  #
+  # One-time cost: CloudBeaver opens an admin-setup wizard on first visit and
+  # the connection is added by hand. See `make db-ui` for the values to paste.
+  # If that annoys you, delete this service -- `make db-shell` needs no setup.
+  dbui:
+    image: dbeaver/cloudbeaver:latest
+    container_name: mvp_dbui
+    ports:
+      - "${DBUI_PORT:-8978}:8978"
+    volumes:
+      - dbui_data:/opt/cloudbeaver/workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./apps/api
+    container_name: mvp_api
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - ./apps/api:/app
+      # Named volumes over BOTH Gradle dirs, and both are load-bearing.
+      #
+      # gradle_cache is the dependency cache -- the Java equivalent of putting a
+      # volume over node_modules. Without it every `docker compose up`
+      # re-downloads the entire dependency graph.
+      #
+      # gradle_build matters for a different reason: the bind mount above makes
+      # the host's filesystem the source of truth for /app, and on WSL2 that
+      # crossing is slow enough to dominate compile times. Keeping build/ on a
+      # native docker volume is the difference between a ~2s and a ~20s reload,
+      # and it keeps host-side IDE output from colliding with the container's.
+      - gradle_cache:/home/gradle/.gradle
+      - gradle_build:/app/build
+      # Gradle's per-project state: the configuration cache and daemon
+      # registry. Same reasoning as gradle_build -- written on every
+      # invocation, and on the host bind mount that write shows up in every
+      # reload.
+      - gradle_project_cache:/app/.gradle
+    environment:
+      # `db` is the compose service name, never localhost -- inside a container
+      # localhost is that container.
+      #
+      # encrypt=false is the SQL-Server-specific trap. The 12.x JDBC driver
+      # flipped the default to encrypt=true, and the server's dev certificate
+      # is self-signed, so the default throws
+      # "PKIX path building failed: unable to find valid certification path".
+      # Local development only; production uses encrypt=true with a real
+      # certificate, or trustServerCertificate=true against a known host.
+      SPRING_DATASOURCE_URL: >-
+        jdbc:sqlserver://db:1433;databaseName=${MSSQL_DB:-mvp};encrypt=false
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}
+      # The origin the browser sends, so it is a host URL. `http://web:5173`
+      # would be wrong twice over: the browser cannot resolve `web`, and CORS
+      # compares against what the browser actually sent.
+      APP_WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      # A JVM in a container reads the *host's* total RAM unless told
+      # otherwise, sizes its heap against that, and gets OOM-killed. This and
+      # the mem_limit below are a pair -- neither works alone.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    mem_limit: ${API_MEM_LIMIT:-3g}
+    depends_on:
+      # Not `db: service_healthy`. A healthy server is not the same as an
+      # existing database, and Flyway needs the database.
+      db-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+    container_name: mvp_web
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./apps/web:/app
+      # Without this the host's node_modules (or its absence) shadows the one
+      # `npm ci` built in the image, and the dev server dies on the first
+      # import. A named volume wins because it is mounted deeper.
+      - web_node_modules:/app/node_modules
+    environment:
+      # Read by the browser, so `localhost` is correct here -- this is the one
+      # place a service name would be wrong. Compare APP_WEB_ORIGIN above:
+      # same rule, opposite direction.
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  dbui_data:
+  gradle_cache:
+  gradle_build:
+  gradle_project_cache:
+  web_node_modules:
