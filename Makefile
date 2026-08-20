@@ -1,7 +1,7 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
 	api-test api-build web-install web-add web-typecheck web-lint web-build \
-	migrate-status types api-restart web-restart
+	migrate-status migrate-repair types api-restart web-restart
 
 # Every target here is `docker compose` underneath. Nothing in this project
 # needs a JDK, Gradle, Node, or sqlcmd on the host -- Docker is the only
@@ -78,6 +78,21 @@ migrate-status: ## Show Flyway's applied-migration history
 	docker compose exec db $(SQLCMD) -Q \
 		"SET NOCOUNT ON; SELECT installed_rank, version, description, success \
 		 FROM dbo.flyway_schema_history ORDER BY installed_rank;"
+
+# Flyway checksums the whole migration file, comments included. Editing an
+# already-applied migration -- even a stale doc link in a comment -- makes it
+# refuse to validate, and the API then never starts. The real fix is to never
+# edit an applied migration; this target is for when someone already did.
+#
+# The checksum to pass is the "Resolved locally" number Flyway prints in
+# `docker compose logs api`, i.e. the fingerprint of the file as it is now:
+#   make migrate-repair VERSION=2 CHECKSUM=-1404914517
+migrate-repair: ## Re-point one applied migration's checksum at the current file
+	@test -n "$(VERSION)"  || (echo "VERSION= is required (e.g. VERSION=2)"; exit 1)
+	@test -n "$(CHECKSUM)" || (echo "CHECKSUM= is required -- the 'Resolved locally' value from the api logs"; exit 1)
+	docker compose exec db $(SQLCMD) -Q \
+		"UPDATE dbo.flyway_schema_history SET checksum = $(CHECKSUM) \
+		 WHERE version = '$(VERSION)';"
 
 api-test: ## Run the Spring Boot test suite
 	docker compose exec api gradle test
