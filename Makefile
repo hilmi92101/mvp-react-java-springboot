@@ -1,6 +1,6 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
-	api-test api-build web-typecheck web-lint web-build \
+	api-test api-build web-install web-typecheck web-lint web-build \
 	migrate-status types api-restart web-restart
 
 # Every target here is `docker compose` underneath. Nothing in this project
@@ -79,6 +79,18 @@ api-test: ## Run the Spring Boot test suite
 
 api-build: ## Full compile, excluding tests
 	docker compose exec api gradle build -x test
+
+# node_modules is a named volume, so a dependency added to package.json on the
+# host is invisible to the container until this runs. It also rewrites the
+# bind-mounted package-lock.json, which is what `npm ci` in the Dockerfile
+# needs -- an out-of-sync lock makes the next image build fail, not warn.
+#
+# `run --rm`, not `exec`: the missing dependency is usually what crashed the
+# dev server, and `exec` cannot attach to a restarting container. A one-off
+# container shares the same node_modules volume, so the install still lands.
+web-install: ## Install apps/web dependencies inside the container
+	docker compose run --rm --no-deps web npm install
+	docker compose up -d web
 
 web-typecheck: ## tsc, no emit
 	docker compose exec web npx tsc -b --noEmit

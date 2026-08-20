@@ -12,7 +12,7 @@ h1 {
 
 .sub {
   margin: 0.4rem 0 2rem;
-  color: var(--muted);
+  color: var(--muted-ink);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -35,7 +35,7 @@ h1 {
 
 .composer input:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-ink);
   outline-offset: 2px;
 }
 
@@ -50,7 +50,7 @@ button {
 .composer button {
   padding: 0.65rem 1.1rem;
   color: var(--bg);
-  background: var(--accent);
+  background: var(--accent-ink);
   font-weight: 550;
 }
 
@@ -88,7 +88,7 @@ button {
 }
 
 .notes input[type='checkbox'] {
-  accent-color: var(--accent);
+  accent-color: var(--accent-ink);
   width: 1.05rem;
   height: 1.05rem;
   flex-shrink: 0;
@@ -101,12 +101,12 @@ button {
 }
 
 .notes li.done .title {
-  color: var(--muted);
+  color: var(--muted-ink);
   text-decoration: line-through;
 }
 
 time {
-  color: var(--muted);
+  color: var(--muted-ink);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -114,7 +114,7 @@ time {
 
 .remove {
   background: none;
-  color: var(--muted);
+  color: var(--muted-ink);
   font-size: 1.15rem;
   line-height: 1;
   padding: 0.15rem 0.4rem;
@@ -128,7 +128,7 @@ time {
 .empty,
 .error {
   padding: 1.5rem 0;
-  color: var(--muted);
+  color: var(--muted-ink);
   font-size: 0.9rem;
   text-align: center;
 }

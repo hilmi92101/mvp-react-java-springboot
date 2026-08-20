@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, type Note } from './api'
-import './App.css'
+import { api, type Note } from '@/api'
+import './notes.css'
 
-export default function App() {
+export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [title, setTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
