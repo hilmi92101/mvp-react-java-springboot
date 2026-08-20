@@ -1,6 +1,6 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
-	api-test api-build web-install web-typecheck web-lint web-build \
+	api-test api-build web-install web-add web-typecheck web-lint web-build \
 	migrate-status types api-restart web-restart
 
 # Every target here is `docker compose` underneath. Nothing in this project
@@ -90,6 +90,16 @@ api-build: ## Full compile, excluding tests
 # container shares the same node_modules volume, so the install still lands.
 web-install: ## Install apps/web dependencies inside the container
 	docker compose run --rm --no-deps web npm install
+	docker compose up -d web
+
+# `make web-add PKG=redux-saga` -- or PKG="a b c" for several at once. Same
+# `run --rm` reasoning as web-install: a one-off container writes into the
+# shared node_modules volume and into the bind-mounted package.json/lock, so
+# the host stays the source of truth. Adding a *dev* dependency:
+# `make web-add PKG="-D @types/google.maps"`.
+web-add: ## Add a dependency inside the container (PKG=name, or PKG="-D name")
+	@test -n "$(PKG)" || { echo 'usage: make web-add PKG=<package>'; exit 1; }
+	docker compose run --rm --no-deps web npm install $(PKG)
 	docker compose up -d web
 
 web-typecheck: ## tsc, no emit

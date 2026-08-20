@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/notes": {
+    "/api/places": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,6 +12,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["list"];
+        put?: never;
+        post: operations["save"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_1"];
         put?: never;
         post: operations["create"];
         delete?: never;
@@ -36,10 +52,48 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/api/places/{placeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_1"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SaveFavouritePlace: {
+            placeId: string;
+            name: string;
+            formattedAddress: string;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+        };
+        FavouritePlaceResponse: {
+            /** Format: uuid */
+            id: string;
+            placeId: string;
+            name: string;
+            formattedAddress: string;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
         CreateNote: {
             title: string;
         };
@@ -65,6 +119,50 @@ export interface components {
 export type $defs = Record<string, never>;
 export interface operations {
     list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FavouritePlaceResponse"][];
+                };
+            };
+        };
+    };
+    save: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveFavouritePlace"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FavouritePlaceResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -151,6 +249,26 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["NoteResponse"];
                 };
+            };
+        };
+    };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

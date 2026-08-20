@@ -151,6 +151,12 @@ services:
       # place a service name would be wrong. Compare APP_WEB_ORIGIN above:
       # same rule, opposite direction.
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+      # Ships to the browser inside the bundle, so it is public by definition.
+      # What protects it is the HTTP-referrer restriction on the key itself
+      # (localhost:5173 only), not secrecy -- see docs/plans/place-autocomplete.md
+      # Question #7. No default: an empty value makes the Place Finder page say
+      # the key is missing, which is a better failure than a blank map.
+      VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     depends_on:
       - api
     restart: unless-stopped
