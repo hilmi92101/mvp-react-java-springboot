@@ -1,5 +1,5 @@
 -- Starred places from the Place Finder app. Only favourites are persisted:
--- the search history is a session list in Redux (docs/plans/place-autocomplete.md
+-- the search history is a session list in Redux (docs/plans/place-finder.md
 -- Question #5), so there is no table for it.
 CREATE TABLE favourite_places (
     -- Same choice as V1: application-generated UUID (GenerationType.UUID), so

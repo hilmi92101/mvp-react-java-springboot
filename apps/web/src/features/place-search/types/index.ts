@@ -36,7 +36,7 @@ export interface SelectedPlace {
  * One row in the session's search history.
  *
  * A "search" is one *selected place*, not one debounced keystroke — see
- * docs/plans/place-autocomplete.md Question #10. That is what makes a row
+ * docs/plans/place-finder.md Question #10. That is what makes a row
  * clickable: clicking it puts the place back on the map.
  */
 export interface SearchHistoryEntry extends SelectedPlace {

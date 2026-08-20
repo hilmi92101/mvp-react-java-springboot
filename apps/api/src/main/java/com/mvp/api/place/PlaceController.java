@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
  * The routes are keyed on Google's {@code place_id} and not our own UUID: the
  * browser never holds our id (it renders straight from a Places API response),
  * so an id-keyed DELETE would force a lookup round trip for nothing.
- * See docs/plans/place-autocomplete.md Question #6.
+ * See docs/plans/place-finder.md Question #6.
  */
 @RestController
 @RequestMapping("/api/places")

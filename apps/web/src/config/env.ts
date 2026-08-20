@@ -4,7 +4,7 @@
  *
  * Everything here is compiled into the bundle and therefore public. That is
  * fine for the Maps key — it is protected by an HTTP-referrer restriction on
- * the key itself, not by secrecy (see docs/plans/place-autocomplete.md
+ * the key itself, not by secrecy (see docs/plans/place-finder.md
  * Question #7) — and it is the reason no server-side secret may ever be read
  * through this file.
  */
