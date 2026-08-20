@@ -13,6 +13,8 @@ make up                  # first run pulls images and resolves dependencies
 |---|---|
 | Web | http://localhost:5173 |
 | API | http://localhost:8080/api/notes |
+| API Playground | http://localhost:5173/apps/api-playground |
+| Place Finder | http://localhost:5173/apps/place-finder |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | CloudBeaver | `make db-ui` (prints URL + connection values) |
 
@@ -21,9 +23,6 @@ make up                  # first run pulls images and resolves dependencies
 The first `make up` takes a few minutes — Gradle resolves the dependency graph,
 Vite installs, and SQL Server initialises a fresh data directory. Measured after
 that: ~90s from `make up` to the API answering.
-
-> Not a git repository, by design. `.gitignore` is written and ready for the
-> day `git init` happens, so the first commit does not sweep in build output.
 
 ## What it is
 
@@ -38,8 +37,13 @@ infra/
   db/     the one-shot script that creates the database
 docs/
   architecture/     how the Docker flow works and why
+  features/         what each app does
   troubleshooting/  the traps, with symptoms
+docs-postman/       the Postman collection -- tracked, unlike docs/
 ```
+
+The database is named **`TESTDB`**. `MSSQL_DB` in `.env` is the one place to
+change it; four other files read that variable rather than hard-coding a name.
 
 No root `package.json`. There is no dependency graph spanning a Java and a
 TypeScript project, so a Turborepo or Nx root would be ceremony. The `Makefile`
@@ -53,15 +57,22 @@ Not assumed — run against this tree:
 - Flyway applies `V1`; Hibernate's `ddl-auto: validate` agrees with it
 - Full CRUD: POST 201, PATCH 200, DELETE 204, blank title 400, unknown id 404
 - Non-Latin titles round-trip intact (the `NVARCHAR` decision, asserted)
-- `make api-test` — 4 tests green against the real SQL Server
-- `make web-typecheck`, `make web-lint` — clean
+- Every request lands in `apps/api/logs/api.log` on the host, headers masked
+  and bodies capped; the plain-English version is in `activity.log` beside it
+- `GET /api/notes?page=0` returns 10 records and a `totalElements`; bare
+  `GET /api/notes` still returns a flat array
+- Two server-side third-party calls: `api.frankfurter.app` (keyless) and Google
+  Places (key held server-side, never in the bundle)
+- `make api-test` — 32 tests green against the real SQL Server
+- `make postman` — 17 requests, 64 assertions, all passing via `newman`
+- `make web-typecheck`, `make web-lint`, `make web-build` — clean
 - Hot reload: ~14s first edit, ~8-10s warm
 
 ## Stack notes
 
 **SQL Server needs a database created before Flyway can run.** There is no
 `POSTGRES_DB` equivalent, so a fresh volume has a server and no application
-database, and Flyway fails with `Cannot open database "mvp"` — which reads like
+database, and Flyway fails with `Cannot open database "TESTDB"` — which reads like
 a permissions problem and is not one. The `db-init` one-shot service handles it,
 and `api` waits on `service_completed_successfully` rather than on the server
 being healthy. A healthy server is not the same as an existing database.
@@ -103,12 +114,25 @@ make types    # /v3/api-docs -> apps/web/src/api-types.ts
 `apps/web/src/api.ts` derives its types from that file, so changing a Java record
 without regenerating is a type error rather than a runtime surprise.
 
+**Requests are logged to files, not just the console.** `apps/api/logs/api.log`
+has the request/response pair for every call — method, path, masked headers,
+body capped at 2 KB, status, duration — and `activity.log` has one plain
+sentence per action. Both are on the host without a compose change, because the
+`api` service already bind-mounts `./apps/api`.
+
+Every response carries an `X-Request-Id`, and every log line is prefixed with
+it, so one `grep` reconstructs a single call end to end. The
+[API Playground](http://localhost:5173/apps/api-playground) shows that id next
+to each response — see [docs/features/api-playground.md](docs/features/api-playground.md).
+
 ## Common targets
 
 ```bash
-make logs            # or api-logs / web-logs / db-logs
+make logs            # or api-logs / web-logs / db-logs -- the console
+make api-file-logs   # the two files the API writes, on the host
 make db-init-logs    # first stop if the API cannot reach the database
 make api-test        # JUnit, against the real SQL Server
+make postman         # newman, against the running stack
 make web-typecheck   # tsc --noEmit
 make db-shell        # sqlcmd, no host install
 make db-ui           # CloudBeaver URL + values to paste

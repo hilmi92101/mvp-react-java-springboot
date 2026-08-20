@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router'
 
 import { StoreProvider } from '@/app/store-provider'
+import ApiPlaygroundPage from '@/pages/api-playground'
 import HomePage from '@/pages/home'
 import NotesPage from '@/pages/notes'
 import PlaceFinderPage from '@/pages/place-finder'
@@ -29,6 +30,7 @@ export function AppRouter() {
           <Route path="/" element={<HomePage />} />
           <Route path="/notes" element={<NotesPage />} />
           <Route path="/apps/place-finder" element={<PlaceFinderPage />} />
+          <Route path="/apps/api-playground" element={<ApiPlaygroundPage />} />
         </Routes>
       </BrowserRouter>
     </StoreProvider>

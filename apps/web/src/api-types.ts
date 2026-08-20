@@ -27,6 +27,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** List notes -- a flat array, or a page of 10 when ?page= is given */
         get: operations["list_1"];
         put?: never;
         post: operations["create"];
@@ -43,13 +44,64 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["get"];
         put?: never;
         post?: never;
         delete: operations["delete"];
         options?: never;
         head?: never;
         patch: operations["update"];
+        trace?: never;
+    };
+    "/api/places/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Text search against Google Places, key held server-side */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/places/details/{placeId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One place by Google's place id */
+        get: operations["details"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/external/rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Live FX rates from api.frankfurter.app -- no API key involved */
+        get: operations["rates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/places/{placeId}": {
@@ -109,6 +161,65 @@ export interface components {
             done?: boolean;
             title?: string;
         };
+        PlaceSearchResults: {
+            results: components["schemas"]["PlaceSummary"][];
+            /**
+             * Format: int64
+             * @description Upstream round trip, milliseconds
+             */
+            upstreamMs: number;
+            source: string;
+        };
+        PlaceSummary: {
+            placeId: string;
+            name: string;
+            formattedAddress: string;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+        };
+        PlaceDetail: {
+            placeId: string;
+            name: string;
+            formattedAddress: string;
+            /** Format: double */
+            lat: number;
+            /** Format: double */
+            lng: number;
+            /** Format: double */
+            rating?: number;
+            websiteUri?: string;
+        };
+        PagedNotes: {
+            content: components["schemas"]["NoteResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int32 */
+            totalPages: number;
+            /** Format: int64 */
+            totalElements: number;
+            first: boolean;
+            last: boolean;
+        };
+        RatesResponse: {
+            /** @example MYR */
+            base: string;
+            /** Format: date */
+            date: string;
+            rates: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Upstream round trip, milliseconds
+             */
+            upstreamMs: number;
+            /** @description Which third party answered */
+            source: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -164,7 +275,9 @@ export interface operations {
     };
     list_1: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -177,7 +290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["NoteResponse"][];
+                    "application/json": components["schemas"]["NoteResponse"][] | components["schemas"]["PagedNotes"];
                 };
             };
         };
@@ -197,6 +310,28 @@ export interface operations {
         responses: {
             /** @description Created */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NoteResponse"];
+                };
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -248,6 +383,72 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NoteResponse"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlaceSearchResults"];
+                };
+            };
+        };
+    };
+    details: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                placeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PlaceDetail"];
+                };
+            };
+        };
+    };
+    rates: {
+        parameters: {
+            query?: {
+                base?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RatesResponse"];
                 };
             };
         };

@@ -36,7 +36,7 @@ services:
     mem_limit: ${DB_MEM_LIMIT:-2g}
     restart: unless-stopped
 
-  # One-shot: creates the `mvp` database, then exits 0.
+  # One-shot: creates the `TESTDB` database, then exits 0.
   #
   # SQL Server has no POSTGRES_DB equivalent -- MSSQL_SA_PASSWORD creates a
   # login and nothing else, so a fresh volume has no application database and
@@ -48,7 +48,7 @@ services:
     entrypoint: ["/init/init.sh"]
     environment:
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}
-      MSSQL_DB: ${MSSQL_DB:-mvp}
+      MSSQL_DB: ${MSSQL_DB:-TESTDB}
       MSSQL_HOST: db
     volumes:
       - ./infra/db:/init:ro
@@ -115,13 +115,17 @@ services:
       # Local development only; production uses encrypt=true with a real
       # certificate, or trustServerCertificate=true against a known host.
       SPRING_DATASOURCE_URL: >-
-        jdbc:sqlserver://db:1433;databaseName=${MSSQL_DB:-mvp};encrypt=false
+        jdbc:sqlserver://db:1433;databaseName=${MSSQL_DB:-TESTDB};encrypt=false
       SPRING_DATASOURCE_USERNAME: sa
       SPRING_DATASOURCE_PASSWORD: ${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}
       # The origin the browser sends, so it is a host URL. `http://web:5173`
       # would be wrong twice over: the browser cannot resolve `web`, and CORS
       # compares against what the browser actually sent.
       APP_WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      # Server-side only -- no VITE_ prefix, so it cannot reach the bundle.
+      # /api/places/search answers 503 with an explanation when it is empty,
+      # which is why there is no default here either.
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
       # A JVM in a container reads the *host's* total RAM unless told
       # otherwise, sizes its heap against that, and gets OOM-killed. This and
       # the mem_limit below are a pair -- neither works alone.

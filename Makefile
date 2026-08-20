@@ -1,7 +1,8 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
 	api-test api-build web-install web-add web-typecheck web-lint web-build \
-	migrate-status migrate-repair types api-restart web-restart
+	migrate-status migrate-repair types api-restart web-restart \
+	postman api-file-logs
 
 # Every target here is `docker compose` underneath. Nothing in this project
 # needs a JDK, Gradle, Node, or sqlcmd on the host -- Docker is the only
@@ -10,7 +11,7 @@
 # Repeated in three targets, so it lives in one place. -C trusts the server's
 # self-signed dev certificate, which the 18.x tools require.
 SQLCMD = /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa \
-	-P "$${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}" -d $${MSSQL_DB:-mvp}
+	-P "$${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}" -d $${MSSQL_DB:-TESTDB}
 
 help:
 	@grep -E '^[a-z-]+:.*?##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t22
@@ -69,7 +70,7 @@ db-ui: ## Start CloudBeaver, print its URL and the connection values to paste
 	@echo "  Driver    SQL Server"
 	@echo "  Host      db          <- the compose service name, not localhost"
 	@echo "  Port      1433"
-	@echo "  Database  $${MSSQL_DB:-mvp}"
+	@echo "  Database  $${MSSQL_DB:-TESTDB}"
 	@echo "  User      sa"
 	@echo "  Password  $${MSSQL_SA_PASSWORD:-Local_Dev_Pass123}"
 	@echo "  Trust server certificate: ON  <- the dev cert is self-signed"
@@ -146,6 +147,23 @@ api-restart: ## Restart Spring Boot (needed after a build.gradle.kts change)
 # the frontend's half of it. Commit the output once this is a repo -- CI should
 # not need a running API, and a diff here is exactly the review signal you
 # want when an endpoint's shape changes.
+# Runs inside the `web` container rather than on the host, for the same reason
+# every other target does: Docker is the only prerequisite this project has, and
+# newman would otherwise need Node installed. `--no-deps` because the stack must
+# already be up -- newman testing a stack it just started would be testing a
+# cold JVM. baseUrl is `api:8080`, the compose service name, because the request
+# comes from inside the network here and not from the host.
+postman: ## Run the docs-postman collection against the running stack
+	docker compose run --rm --no-deps -v "$(PWD)/docs-postman:/pm:ro" web \
+		npx --yes newman run /pm/mvp-api.postman_collection.json \
+		--env-var baseUrl=http://api:8080
+
+# Not `docker compose logs`: that shows the console, and the console is not the
+# file. These two are what the logging requirement actually produced, and they
+# are on the host because compose bind-mounts ./apps/api into the container.
+api-file-logs: ## Tail the two log files RequestLoggingFilter and ActivityLog write
+	tail -f apps/api/logs/api.log apps/api/logs/activity.log
+
 types: ## Generate apps/web/src/api-types.ts from the API's OpenAPI doc
 	curl -sf http://localhost:$${API_PORT:-8080}/v3/api-docs -o apps/web/openapi.json
 	docker compose exec web npx --yes openapi-typescript openapi.json -o src/api-types.ts

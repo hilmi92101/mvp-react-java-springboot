@@ -15,7 +15,11 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "notes")
-public class Note {
+class Note {
+
+    // Package-private, per docs/architecture/folder-structure.md: the entity is
+    // the database shape, and letting it out of `note/` would make a column
+    // rename a breaking API change. NoteDtos is what leaves.
 
     // Generated in the application, not by the database. SQL Server's NEWID()
     // would mean the id is unknown until after the INSERT, and the POST

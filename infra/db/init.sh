@@ -8,7 +8,7 @@
 # `sa` login and nothing else, so a fresh volume gives you a server with only
 # the system databases -- and Flyway's very first act is to connect to a
 # database that does not exist yet. The failure is
-# "Cannot open database "mvp" requested by the login", which reads like a
+# "Cannot open database "TESTDB" requested by the login", which reads like a
 # permissions problem and is not one.
 #
 # So this runs as a one-shot compose service between `db` and `api`. `api`

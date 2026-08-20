@@ -1,5 +1,6 @@
 package com.mvp.api.note;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,5 +79,87 @@ class NoteControllerTest {
                         .content("{\"title\":\"日本語 · Ünïcödé\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("日本語 · Ünïcödé"));
+    }
+
+    @Test
+    void gettingOneNoteByIdRoundTrips() throws Exception {
+        String created = mvc.perform(post("/api/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"fetch me by id\"}"))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String id = created.replaceAll(".*\"id\":\"([^\"]+)\".*", "$1");
+
+        mvc.perform(get("/api/notes/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("fetch me by id"));
+    }
+
+    @Test
+    void gettingAnUnknownIdIs404() throws Exception {
+        mvc.perform(get("/api/notes/{id}", "00000000-0000-0000-0000-000000000000"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletingAnUnknownIdIs404() throws Exception {
+        mvc.perform(delete("/api/notes/{id}", "00000000-0000-0000-0000-000000000000"))
+                .andExpect(status().isNotFound());
+    }
+
+    // Bare GET keeps its flat-array shape. This is the assertion that fails if
+    // someone "tidies up" by making pagination unconditional -- which would
+    // break the notes page and api.ts without touching either file.
+    @Test
+    void bareListStaysAFlatArray() throws Exception {
+        mvc.perform(get("/api/notes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void pageZeroReturnsAnEnvelopeOfAtMostTen() throws Exception {
+        for (int i = 0; i < 12; i++) {
+            mvc.perform(post("/api/notes")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"title\":\"paged " + i + "\"}"))
+                    .andExpect(status().isCreated());
+        }
+
+        mvc.perform(get("/api/notes").param("page", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(10))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.totalElements").value(org.hamcrest.Matchers.greaterThanOrEqualTo(12)));
+    }
+
+    // Ten is the requirement, not a suggestion. A client asking for 500 gets
+    // ten, because `size` is not a request parameter at all.
+    @Test
+    void theClientCannotWidenThePage() throws Exception {
+        mvc.perform(get("/api/notes").param("page", "0").param("size", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(10));
+    }
+
+    @Test
+    void aNegativePageIsClampedRatherThanRejected() throws Exception {
+        mvc.perform(get("/api/notes").param("page", "-3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0));
+    }
+
+    // Every response carries the id that ties it to a line in logs/api.log.
+    // Without this header the log file is there but unusable from the outside.
+    @Test
+    void everyResponseCarriesARequestId() throws Exception {
+        mvc.perform(get("/api/notes"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().exists("X-Request-Id"));
     }
 }

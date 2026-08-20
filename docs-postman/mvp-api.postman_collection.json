@@ -1,0 +1,707 @@
+{
+  "info": {
+    "name": "MVP API",
+    "_postman_id": "6f0f8e2c-2a1e-4c6f-9b1a-mvpapi000001",
+    "description": "Every endpoint the Spring Boot API serves, with assertions.\n\nRun the folders top to bottom: **Notes** creates a note and reuses its id, **Google Places** searches and reuses the first place id. Running a single request out of order fails on a missing collection variable, which is deliberate -- a green run has to mean the whole flow worked.\n\nEvery response is asserted to carry an `X-Request-Id`. Grep that value in `apps/api/logs/api.log` on the host to see exactly what the server wrote down for that request.\n\nSee README.md next to this file for import and `newman` instructions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Runs for every request in the collection, so no folder can forget it.",
+          "// The header is the whole contract between this collection and",
+          "// apps/api/logs/api.log -- without it a failing run cannot be traced.",
+          "pm.test('carries an X-Request-Id', function () {",
+          "    pm.expect(pm.response.headers.get('X-Request-Id')).to.be.a('string').and.not.empty;",
+          "});",
+          "",
+          "pm.test('answers within 20 seconds', function () {",
+          "    // Deliberately loose. Two folders make a real outbound call over the",
+          "    // public internet, and the API's own outbound read timeout is 10s --",
+          "    // a bound tighter than that would fail on someone else's slow server",
+          "    // rather than on anything in this repo.",
+          "    pm.expect(pm.response.responseTime).to.be.below(20000);",
+          "});"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "noteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "countBeforeReject",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Notes",
+      "description": "CRUD, pagination and the rollback proof.",
+      "item": [
+        {
+          "name": "List every note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('is a flat array, not an envelope', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ]
+            },
+            "description": "The un-paged shape. Bare GET keeps returning a flat array, which is why the notes page needed no change when pagination landed."
+          },
+          "response": []
+        },
+        {
+          "name": "Create a note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const note = pm.response.json();",
+                  "pm.test('the id and timestamp come back on the POST itself', function () {",
+                  "    // The frontend prepends the created note without a refetch, which",
+                  "    // only works if both are populated here.",
+                  "    pm.expect(note.id).to.be.a('string').and.not.empty;",
+                  "    pm.expect(note.createdAt).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('starts undone', () => pm.expect(note.done).to.equal(false));",
+                  "pm.collectionVariables.set('noteId', note.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ]
+            },
+            "description": "Writes a row and one sentence into activity.log. Stashes the id for the requests below, so this folder runs top to bottom.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"from the postman collection\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Read one note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('is the note we just created', function () {",
+                  "    pm.expect(pm.response.json().id).to.equal(pm.collectionVariables.get('noteId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes",
+                "{{noteId}}"
+              ]
+            },
+            "description": "Uses the id the Create request stashed. Fails with a 404 if run on its own."
+          },
+          "response": []
+        },
+        {
+          "name": "Page 0 -- ten records",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const page = pm.response.json();",
+                  "pm.test('the envelope has every field', function () {",
+                  "    pm.expect(page).to.have.all.keys('content', 'page', 'size', 'totalPages', 'totalElements', 'first', 'last');",
+                  "});",
+                  "pm.test('page size is ten', () => pm.expect(page.size).to.equal(10));",
+                  "pm.test('at most ten records', () => pm.expect(page.content.length).to.be.at.most(10));",
+                  "pm.test('page 0 is the first page', () => pm.expect(page.first).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes?page=0",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "The pagination requirement. Ten per page, and `size` is clamped server-side so the client cannot widen it."
+          },
+          "response": []
+        },
+        {
+          "name": "Page size cannot be widened",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('still ten, not 500', () => pm.expect(pm.response.json().size).to.equal(10));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes?page=0&size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "500"
+                }
+              ]
+            },
+            "description": "Ten per page is the requirement, not a default. `size` is not a request parameter at all -- this proves it is ignored rather than honoured."
+          },
+          "response": []
+        },
+        {
+          "name": "Tick the note off",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('done is now true', () => pm.expect(pm.response.json().done).to.equal(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes",
+                "{{noteId}}"
+              ]
+            },
+            "description": "PATCH and not PUT: the checkbox sends `done` alone and has no reason to know the title.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"done\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rejected write -- a blank title",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Counted before the rejected POST, not after. Comparing two",
+                  "// counts taken after the write would pass no matter what the",
+                  "// write did, which is the easy way to write a test that",
+                  "// never fails.",
+                  "pm.sendRequest(pm.variables.get('baseUrl') + '/api/notes', function (err, res) {",
+                  "    pm.collectionVariables.set('countBeforeReject', err ? -1 : res.json().length);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 -- a blank title fails validation', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ]
+            },
+            "description": "The rollback demonstration, half one. A blank title fails validation; the next request proves nothing was written.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"   \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rollback held -- count did not move",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('the rejected POST wrote nothing', function () {",
+                  "    const before = Number(pm.collectionVariables.get('countBeforeReject'));",
+                  "    pm.expect(before).to.be.at.least(0);",
+                  "    pm.expect(pm.response.json().length).to.equal(before);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes"
+              ]
+            },
+            "description": "The rollback demonstration, half two. The count after the rejected write equals the count now."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete the note",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204', () => pm.response.to.have.status(204));",
+                  "pm.collectionVariables.unset('noteId');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/{{noteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes",
+                "{{noteId}}"
+              ]
+            },
+            "description": "204 with no body. Leaves the database as the run found it, which is what makes this collection re-runnable."
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown id is a 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notes/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notes",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            },
+            "description": "An unknown id is a 404, not an empty 200. Worth asserting: the difference is invisible to a client that only checks for a body."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Third party (keyless)",
+      "description": "The fan-out that needs no credential.",
+      "item": [
+        {
+          "name": "Live FX rates",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('re-shaped, not passed through', function () {",
+                  "    // `upstreamMs` and `source` are ours -- frankfurter sends neither.",
+                  "    // If they vanish, someone has started proxying the raw response.",
+                  "    pm.expect(body).to.have.property('upstreamMs');",
+                  "    pm.expect(body.source).to.equal('api.frankfurter.app');",
+                  "});",
+                  "pm.test('has rates against the base we asked for', function () {",
+                  "    pm.expect(body.base).to.equal('MYR');",
+                  "    pm.expect(Object.keys(body.rates).length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/external/rates?base=MYR",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "external",
+                "rates"
+              ],
+              "query": [
+                {
+                  "key": "base",
+                  "value": "MYR"
+                }
+              ]
+            },
+            "description": "The server-side third-party call. api.frankfurter.app needs no API key, which is why this is the request that keeps working when a credentialed one does not."
+          },
+          "response": []
+        },
+        {
+          "name": "A bad currency code is a 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/external/rates?base=NOTACURRENCY",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "external",
+                "rates"
+              ],
+              "query": [
+                {
+                  "key": "base",
+                  "value": "NOTACURRENCY"
+                }
+              ]
+            },
+            "description": "`base` is concatenated into an outbound URL, so it is pattern-checked rather than passed through. This asserts the check is still there."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Google Places (server-side key)",
+      "description": "The fan-out that does.",
+      "item": [
+        {
+          "name": "Search Google Places",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 -- a 503 means GOOGLE_PLACES_API_KEY is unset, a 502 means Google rejected it', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('results are our shape, not Google\\'s', function () {",
+                  "    // Google sends displayName.text; we send name. If this fails,",
+                  "    // someone is proxying the upstream body straight through.",
+                  "    pm.expect(body.results[0]).to.have.all.keys('placeId', 'name', 'formattedAddress', 'lat', 'lng');",
+                  "});",
+                  "pm.collectionVariables.set('placeId', body.results[0].placeId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/places/search?q=kuala lumpur",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "places",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "kuala lumpur"
+                }
+              ]
+            },
+            "description": "The same search the Place Finder page does in the browser, moved behind the API. The key lives in GOOGLE_PLACES_API_KEY on the server and never reaches a client.\n\nA 503 here means the key is not set. A 502 means Google rejected it -- most likely an HTTP-referrer restriction, which a server cannot satisfy."
+          },
+          "response": []
+        },
+        {
+          "name": "One place by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('is the place we searched for', function () {",
+                  "    pm.expect(pm.response.json().placeId).to.equal(pm.collectionVariables.get('placeId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/places/details/{{placeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "places",
+                "details",
+                "{{placeId}}"
+              ]
+            },
+            "description": "Uses the id the search stashed."
+          },
+          "response": []
+        },
+        {
+          "name": "A malformed place id is a 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/places/details/not-a-place-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "places",
+                "details",
+                "not-a-place-id"
+              ]
+            },
+            "description": "Google's own 4xx is passed through as a 4xx and not swallowed as a 502. Getting this wrong sends whoever is debugging to look at the wrong machine."
+          },
+          "response": []
+        },
+        {
+          "name": "Starred places",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('is an array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/places",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "places"
+              ]
+            },
+            "description": "The database side of the same feature. Starring happens on the Place Finder page at /apps/place-finder."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

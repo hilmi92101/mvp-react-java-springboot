@@ -9,7 +9,7 @@ spring:
     # encrypt=false is the SQL Server trap. The 12.x JDBC driver flipped the
     # default to encrypt=true and the dev server's certificate is self-signed,
     # so the default fails with "PKIX path building failed". Development only.
-    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://db:1433;databaseName=mvp;encrypt=false}
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://db:1433;databaseName=TESTDB;encrypt=false}
     username: ${SPRING_DATASOURCE_USERNAME:sa}
     password: ${SPRING_DATASOURCE_PASSWORD:Local_Dev_Pass123}
 
@@ -52,6 +52,31 @@ server:
 
 app:
   web-origin: ${APP_WEB_ORIGIN:http://localhost:5173}
+
+  google:
+    # No VITE_ prefix, and that is the whole point: Vite only inlines VITE_*
+    # variables, so this one cannot end up in the browser bundle. The Place
+    # Finder page still uses its own browser key -- see
+    # docs/features/api-playground.md.
+    #
+    # Empty default rather than a required property: an unset key must make
+    # /api/places/search answer 503 with a sentence, not stop the whole
+    # application from starting.
+    places-key: ${GOOGLE_PLACES_API_KEY:}
+
+  external:
+    # Keyless by design. This is the third-party demo that has to keep working
+    # when a credentialed one does not.
+    rates-url: ${APP_EXTERNAL_RATES_URL:https://api.frankfurter.app/latest}
+
+    # Shared by every outbound call -- the rates endpoint and Google Places
+    # both use the one RestClient bean. Generous rather than tight: from inside
+    # Docker on WSL2 a cold DNS lookup regularly costs three seconds on its
+    # own, and that counts towards the connect budget. The point of these is to
+    # stop a dead third party from parking Tomcat threads forever, not to
+    # enforce a latency SLA on someone else's server.
+    connect-timeout: ${APP_EXTERNAL_CONNECT_TIMEOUT:5s}
+    read-timeout: ${APP_EXTERNAL_READ_TIMEOUT:10s}
 
 springdoc:
   api-docs:

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Two files, two audiences, one correlation id in both.
+
+    logs/api.log        the wire: method, path, masked headers, capped body,
+                        status, duration. Written by RequestLoggingFilter.
+    logs/activity.log   one plain sentence per action. Written by ActivityLog.
+
+  The path is relative, so it resolves against the container's working
+  directory /app — which docker-compose.yml bind-mounts from ./apps/api. That
+  is the whole "log to a file on the host" mechanism: no compose change, the
+  files simply appear in apps/api/logs/. *.log is already gitignored.
+-->
+<configuration>
+    <!-- Boot's own console format, so `make api-logs` looks unchanged. The
+         %X{requestId} is the addition: it ties a console line to a file line. -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{HH:mm:ss.SSS} %-5level [%X{requestId:--}] %logger{20} - %msg%n"/>
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:--}] %msg%n"/>
+    <property name="LOG_DIR" value="logs"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="API_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/api.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/api.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <!-- A daily policy alone has no ceiling: one runaway loop fills the
+                 disk and takes the host down, not just the container. -->
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="ACTIVITY_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/activity.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/activity.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <!-- No level and no logger: this file is meant to be readable by
+                 someone who has never seen the code. -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+      additivity="false" on both is load-bearing. Without it every line also
+      walks up to <root> and lands in the other file, and the two files stop
+      being two files. The console appender is attached explicitly here so
+      turning additivity off does not also make them invisible to `make api-logs`.
+    -->
+    <logger name="api.access" level="INFO" additivity="false">
+        <appender-ref ref="API_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <logger name="app.activity" level="INFO" additivity="false">
+        <appender-ref ref="ACTIVITY_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

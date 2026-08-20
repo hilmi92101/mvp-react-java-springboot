@@ -1,5 +1,6 @@
 package com.mvp.api.place;
 
+import com.mvp.api.logging.ActivityLog;
 import com.mvp.api.place.PlaceDtos.FavouritePlaceResponse;
 import com.mvp.api.place.PlaceDtos.SaveFavouritePlace;
 import java.util.List;
@@ -15,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 class PlaceServiceImpl implements PlaceService {
 
     private final PlaceRepository places;
+    private final ActivityLog activity;
 
-    PlaceServiceImpl(PlaceRepository places) {
+    PlaceServiceImpl(PlaceRepository places, ActivityLog activity) {
         this.places = places;
+        this.activity = activity;
     }
 
     @Override
@@ -37,13 +40,24 @@ class PlaceServiceImpl implements PlaceService {
         // what is already stored -- so treating it as an exception would make
         // the normal path the slow one and pollute the log.
         return places.findByPlaceId(body.placeId())
-                .map(FavouritePlaceResponse::from)
-                .orElseGet(() -> FavouritePlaceResponse.from(places.save(new FavouritePlace(
-                        body.placeId(),
-                        body.name(),
-                        body.formattedAddress(),
-                        body.lat(),
-                        body.lng()))));
+                .map(existing -> {
+                    // Logged as "already" rather than not logged at all: a
+                    // re-star that produces no line looks like a dropped
+                    // request when you are reading the file to debug one.
+                    activity.record("Someone re-starred '" + existing.getName()
+                            + "', which was already a favourite");
+                    return FavouritePlaceResponse.from(existing);
+                })
+                .orElseGet(() -> {
+                    activity.record("Someone starred '" + body.name() + "' ("
+                            + body.formattedAddress() + ")");
+                    return FavouritePlaceResponse.from(places.save(new FavouritePlace(
+                            body.placeId(),
+                            body.name(),
+                            body.formattedAddress(),
+                            body.lat(),
+                            body.lng())));
+                });
     }
 
     @Override
@@ -52,6 +66,7 @@ class PlaceServiceImpl implements PlaceService {
         return places.findByPlaceId(placeId)
                 .map(place -> {
                     places.delete(place);
+                    activity.record("Someone un-starred '" + place.getName() + "'");
                     return true;
                 })
                 .orElse(false);
