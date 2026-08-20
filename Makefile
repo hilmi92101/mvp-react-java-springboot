@@ -57,7 +57,12 @@ web: ## Shell into the web container
 db-shell: ## sqlcmd inside the db container
 	docker compose exec db $(SQLCMD)
 
-db-ui: ## Print the CloudBeaver URL and the connection values to paste
+# Starts the service first. Printing a URL without checking the container is
+# up is how you get a dead link and conclude the stack has no database UI --
+# `dbui` was added after `db` and `api`, so an older `make up` never started it.
+db-ui: ## Start CloudBeaver, print its URL and the connection values to paste
+	@docker compose up -d dbui
+	@echo
 	@echo "http://localhost:$${DBUI_PORT:-8978}"
 	@echo
 	@echo "First visit runs an admin-setup wizard, then add a connection:"
