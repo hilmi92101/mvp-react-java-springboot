@@ -2,7 +2,8 @@
 	api-logs web-logs db-logs db-init-logs \
 	api-test api-build web-install web-add web-typecheck web-lint web-build \
 	migrate-status migrate-repair types api-restart web-restart \
-	postman api-file-logs
+	postman api-file-logs \
+	graph graph-update graph-open graph-query graph-relabel
 
 # Every target here is `docker compose` underneath. Nothing in this project
 # needs a JDK, Gradle, Node, or sqlcmd on the host -- Docker is the only
@@ -169,3 +170,34 @@ types: ## Generate apps/web/src/api-types.ts from the API's OpenAPI doc
 	docker compose exec web npx --yes openapi-typescript openapi.json -o src/api-types.ts
 	@rm -f apps/web/openapi.json
 	@echo "wrote apps/web/src/api-types.ts"
+
+# graphify is the one thing here that runs on the host rather than in a
+# container: it reads the working tree directly and writes graphify-out/, which
+# is gitignored. Install once with `uv tool install "graphifyy[sql]"` -- the sql
+# extra is what lets it see the Flyway migrations.
+graph: ## Rebuild the knowledge graph from scratch (graphify-out/)
+	graphify extract --force .
+	graphify export html
+
+graph-update: ## Re-extract only changed files (AST-only, no API cost)
+	graphify update .
+
+graph-open: ## Print the path to the interactive graph
+	@echo "file://$(CURDIR)/graphify-out/graph.html"
+
+# Quote the question: make graph-query Q="how does request logging work"
+graph-query: ## Ask the graph a question (Q="...")
+	@test -n "$(Q)" || { echo 'usage: make graph-query Q="your question"'; exit 1; }
+	@graphify query "$(Q)"
+
+# Community names are written by an agent, not by graphify -- there is no LLM
+# backend configured here, so `graphify label` would fall back to "Community N".
+# The names survive graph-update as long as the community count is unchanged; add
+# or delete enough files and graphify re-clusters and renames them by hub. This
+# restores the curated set. If the count itself changed, the mapping is stale --
+# ask Claude to relabel, then `cp` the result over the .curated.json.
+graph-relabel: ## Restore the curated community names into the graph
+	@test -f graphify-out/.graphify_labels.curated.json \
+		|| { echo "no curated labels: graphify-out/.graphify_labels.curated.json missing"; exit 1; }
+	@cp graphify-out/.graphify_labels.curated.json graphify-out/.graphify_labels.json
+	@graphify cluster-only . --no-label

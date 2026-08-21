@@ -22,3 +22,9 @@ build/
 
 # Internal notes and plans. Kept local, not published to the remote.
 docs/
+
+# graphify knowledge graph. Derived output, rebuilt by `make graph-update`, and
+# it records absolute host paths (.graphify_python, .graphify_root) that are
+# wrong on any other machine. CLAUDE.md and .claude/settings.json ARE tracked --
+# they are the instructions that point at this directory.
+graphify-out/
