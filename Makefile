@@ -1,6 +1,7 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
 	api-test api-build web-install web-add web-typecheck web-lint web-build \
+	web-test web-test-watch test \
 	migrate-status migrate-repair types api-restart web-restart \
 	postman api-file-logs \
 	graph graph-update graph-open graph-query graph-relabel
@@ -129,6 +130,16 @@ web-typecheck: ## tsc, no emit
 
 web-lint: ## oxlint
 	docker compose exec web npm run lint
+
+# In the container, not on the host: node_modules lives in a named volume the
+# host cannot see, so a host `npx vitest` would not find the runner at all.
+# `exec`, not `run --rm`: the dev server is already up and reusing it skips a
+# container start per run.
+web-test: ## Run the Vitest suite once
+	docker compose exec web npm test
+
+web-test-watch: ## Run Vitest in watch mode
+	docker compose exec web npm run test:watch
 
 web-build: ## Production Vite build
 	docker compose exec web npm run build

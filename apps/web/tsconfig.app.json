@@ -6,8 +6,10 @@
     "module": "esnext",
     /* `types` is an allow-list: once it is set, only these @types packages
        contribute globals. @types/google.maps has to be named here or the
-       `google.maps` namespace is invisible even though it is installed. */
-    "types": ["vite/client", "google.maps"],
+       `google.maps` namespace is invisible even though it is installed.
+       "vitest/globals" is what makes `describe`/`it`/`expect` type-check
+       without an import, matching `globals: true` in vite.config.ts. */
+    "types": ["vite/client", "google.maps", "vitest/globals"],
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 

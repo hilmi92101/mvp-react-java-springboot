@@ -28,15 +28,19 @@ import { selectIsFavourite } from './selectors'
  * `takeLatest` guarantees a slow response for "ku" can never overwrite the list
  * for "kuala". Both are one line here and a hand-rolled timer plus a request-id
  * counter otherwise. See the plan's Question #3.
+ *
+ * The workers below are exported for the tests, which step each generator and
+ * assert the effects it yields. Nothing outside this file and its test should
+ * import them -- `placeSearchSaga` is the only entry point the store wires up.
  */
 
 /** Long enough to collapse normal typing, short enough not to feel laggy. */
-const DEBOUNCE_MS = 300
+export const DEBOUNCE_MS = 300
 
 /** What the user sees when Google cannot be reached. */
-const SUGGESTIONS_ERROR = "Couldn't reach Google. Try again."
+export const SUGGESTIONS_ERROR = "Couldn't reach Google. Try again."
 
-function* fetchSuggestions(action: PayloadAction<string>) {
+export function* fetchSuggestions(action: PayloadAction<string>) {
   const query = action.payload.trim()
   // The reducer already emptied the list for a blank input; firing a request
   // for '' would be billed and return nothing.
@@ -52,7 +56,7 @@ function* fetchSuggestions(action: PayloadAction<string>) {
   }
 }
 
-function* fetchPlaceDetails(action: PayloadAction<{ placeId: string; label: string }>) {
+export function* fetchPlaceDetails(action: PayloadAction<{ placeId: string; label: string }>) {
   try {
     const place = (yield call(
       placesSdk.fetchPlaceDetails,
@@ -71,11 +75,11 @@ function* fetchPlaceDetails(action: PayloadAction<{ placeId: string; label: stri
 }
 
 /** The × button also ends the session: what follows is a different search. */
-function* endSession() {
+export function* endSession() {
   yield call(placesSdk.resetSession)
 }
 
-function* loadFavourites() {
+export function* loadFavourites() {
   try {
     const favourites = (yield call(favouritesApi.listFavourites)) as FavouritePlace[]
     yield put(favouritesLoaded(favourites))
@@ -91,7 +95,7 @@ function* loadFavourites() {
  * the UI by the time this runs, so `wasStarred` is read as the state *before*
  * that flip — hence the `!`.
  */
-function* persistFavourite(action: PayloadAction<FavouritePlace>) {
+export function* persistFavourite(action: PayloadAction<FavouritePlace>) {
   const place = action.payload
   const isStarredNow = (yield select(selectIsFavourite, place.placeId)) as boolean
   const wasStarred = !isStarredNow

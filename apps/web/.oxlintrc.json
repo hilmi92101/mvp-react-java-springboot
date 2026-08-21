@@ -18,5 +18,10 @@
     "node_modules",
     "dist",
     "src/api-types.ts"
-  ]
+  ],
+  "env": {
+    "browser": true,
+    "es2024": true,
+    "vitest": true
+  }
 }
