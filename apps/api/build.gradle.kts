@@ -65,9 +65,16 @@ tasks.withType<Test> {
 }
 
 // Tests that need the `db` container are tagged `integration` (see
-// support/IntegrationTest.java). This task is the way to run only those; the
-// plain `test` task still runs everything until the split lands in Stage D1 of
-// docs/plans/testing.md.
+// support/IntegrationTest.java). `test` excludes that tag, so the plain task
+// runs green with the db container stopped; `integrationTest` below is the
+// other half of the split and includes only the tagged ones. `make test` runs
+// both.
+tasks.named<Test>("test") {
+    useJUnitPlatform {
+        excludeTags("integration")
+    }
+}
+
 tasks.register<Test>("integrationTest") {
     description = "Runs only the @Tag(\"integration\") tests, which need the db container."
     group = "verification"

@@ -97,12 +97,14 @@ migrate-repair: ## Re-point one applied migration's checksum at the current file
 		"UPDATE dbo.flyway_schema_history SET checksum = $(CHECKSUM) \
 		 WHERE version = '$(VERSION)';"
 
-api-test: ## Run the Spring Boot test suite
+# The `test` task excludes the `integration` tag, so this is the unit half
+# only and passes with the db container stopped. The other half is
+# `api-integration-test`; `make test` runs both.
+api-test: ## Run the Spring Boot unit tests (no database needed)
 	docker compose exec api gradle test
 
 # Only the tests tagged `integration` -- everything that needs the db
-# container. Useful on its own while working on one of them; `make api-test`
-# still runs the whole suite.
+# container. Useful on its own while working on one of them.
 api-integration-test: ## Run only the database-backed tests
 	docker compose exec api gradle integrationTest
 
@@ -146,6 +148,12 @@ web-test: ## Run the Vitest suite once
 
 web-test-watch: ## Run Vitest in watch mode
 	docker compose exec web npm run test:watch
+
+# Every suite, in the order that fails cheapest first: Vitest, then the backend
+# unit tests, then the database-backed ones. Sequential and fail-fast on
+# purpose -- make stops at the first non-zero exit, so a red frontend does not
+# wait on a JVM. The db container must be up for the last one.
+test: web-test api-test api-integration-test ## Run every suite: web, api unit, api integration
 
 web-build: ## Production Vite build
 	docker compose exec web npm run build

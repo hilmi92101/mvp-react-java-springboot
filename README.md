@@ -63,7 +63,8 @@ Not assumed — run against this tree:
   `GET /api/notes` still returns a flat array
 - Two server-side third-party calls: `api.frankfurter.app` (keyless) and Google
   Places (key held server-side, never in the bundle)
-- `make api-test` — 32 tests green against the real SQL Server
+- `make test` — 183 tests green: 120 Vitest in `apps/web`, 63 JUnit in `apps/api`
+  (13 unit, 50 against the real SQL Server) — see [docs/features/testing.md](docs/features/testing.md)
 - `make postman` — 17 requests, 64 assertions, all passing via `newman`
 - `make web-typecheck`, `make web-lint`, `make web-build` — clean
 - Hot reload: ~14s first edit, ~8-10s warm
@@ -131,7 +132,10 @@ to each response — see [docs/features/api-playground.md](docs/features/api-pla
 make logs            # or api-logs / web-logs / db-logs -- the console
 make api-file-logs   # the two files the API writes, on the host
 make db-init-logs    # first stop if the API cannot reach the database
-make api-test        # JUnit, against the real SQL Server
+make test            # every suite: Vitest, JUnit unit, JUnit integration
+make web-test        # Vitest only
+make api-test        # JUnit unit only -- passes with the db container stopped
+make api-integration-test  # JUnit against the real SQL Server
 make postman         # newman, against the running stack
 make web-typecheck   # tsc --noEmit
 make db-shell        # sqlcmd, no host install

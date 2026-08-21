@@ -41,8 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  *
  * <p>{@code @Tag("integration")} is what {@code make api-integration-test}
- * selects on, and what the plain {@code test} task will exclude so the unit
- * tests stay runnable with the database stopped.
+ * selects on, and what the plain {@code test} task excludes -- which is why
+ * {@code make api-test} runs its 13 tests green with the {@code db} container
+ * stopped. Both halves run under {@code make test}.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
