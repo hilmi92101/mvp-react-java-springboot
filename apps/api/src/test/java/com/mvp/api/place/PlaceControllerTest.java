@@ -6,21 +6,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.mvp.api.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Mirrors NoteControllerTest: real SQL Server in the `db` container, each test
- * rolled back by @Transactional so dev data survives a run.
+ * Mirrors {@link com.mvp.api.note.NoteControllerTest}: the HTTP surface of the
+ * favourites CRUD, against the real SQL Server, each method rolled back by the
+ * {@code @Transactional} inside {@link IntegrationTest}.
+ *
+ * <p>The repository-level behaviour behind these routes -- idempotent save and
+ * the unique constraint it protects -- is asserted in {@link PlaceRepositoryIT}.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@Transactional
+@IntegrationTest
 class PlaceControllerTest {
 
     private static final String KL = """

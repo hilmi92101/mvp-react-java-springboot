@@ -1,6 +1,6 @@
 .PHONY: help up down build logs fresh api web db-shell db-ui \
 	api-logs web-logs db-logs db-init-logs \
-	api-test api-build web-install web-add web-typecheck web-lint web-build \
+	api-test api-integration-test api-build web-install web-add web-typecheck web-lint web-build \
 	web-test web-test-watch test \
 	migrate-status migrate-repair types api-restart web-restart \
 	postman api-file-logs \
@@ -99,6 +99,12 @@ migrate-repair: ## Re-point one applied migration's checksum at the current file
 
 api-test: ## Run the Spring Boot test suite
 	docker compose exec api gradle test
+
+# Only the tests tagged `integration` -- everything that needs the db
+# container. Useful on its own while working on one of them; `make api-test`
+# still runs the whole suite.
+api-integration-test: ## Run only the database-backed tests
+	docker compose exec api gradle integrationTest
 
 api-build: ## Full compile, excluding tests
 	docker compose exec api gradle build -x test

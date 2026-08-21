@@ -7,28 +7,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.mvp.api.support.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Runs against the real SQL Server in the `db` container, not an embedded H2.
+ * The HTTP surface of notes, end to end against the real SQL Server.
  *
- * H2 has a SQL Server compatibility mode and it is not the same database.
- * NVARCHAR handling, UNIQUEIDENTIFIER, datetime2 precision and the default
- * READ COMMITTED locking behaviour all differ, which is exactly where the
- * interesting bugs live. The container is already there; using it costs
- * nothing.
+ * {@link IntegrationTest} carries the four annotations this used to spell out,
+ * including the {@code @Transactional} that rolls each method back -- see that
+ * file for why the real database and not an embedded H2.
  *
- * @Transactional rolls each test back, so the dev data survives a test run.
+ * <p>Page sizes and ordering are asserted one layer down in
+ * {@link NoteRepositoryIT}, which can empty the table first; what belongs here
+ * is the envelope shape the frontend reads.
  */
-@SpringBootTest
-@AutoConfigureMockMvc
-@Transactional
+@IntegrationTest
 class NoteControllerTest {
 
     @Autowired

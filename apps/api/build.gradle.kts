@@ -63,3 +63,20 @@ dependencies {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// Tests that need the `db` container are tagged `integration` (see
+// support/IntegrationTest.java). This task is the way to run only those; the
+// plain `test` task still runs everything until the split lands in Stage D1 of
+// docs/plans/testing.md.
+tasks.register<Test>("integrationTest") {
+    description = "Runs only the @Tag(\"integration\") tests, which need the db container."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("integration")
+    }
+    // Gradle caches a Test task on inputs, and the database is not an input:
+    // without this, a second run reports UP-TO-DATE and asserts nothing.
+    outputs.upToDateWhen { false }
+}
