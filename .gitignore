@@ -9,6 +9,10 @@ node_modules/
 dist/
 *.log
 
+# Runtime logs. `*.log` above misses the rotated, gzipped files logback writes
+# (api.2026-08-20.0.log.gz), so ignore the whole directory.
+apps/api/logs/
+
 # Gradle / Java
 .gradle/
 build/
