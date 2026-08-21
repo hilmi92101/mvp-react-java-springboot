@@ -26,6 +26,12 @@ class ResizeObserverStub implements ResizeObserver {
 
 globalThis.ResizeObserver ??= ResizeObserverStub
 
+// jsdom has no layout, so it ships no scrollIntoView at all -- the property is
+// simply absent and a call throws "not a function". Any component that keeps a
+// highlighted row visible reaches it, which in this app is the autocomplete
+// dropdown's arrow-key handling.
+Element.prototype.scrollIntoView ??= function scrollIntoView() {}
+
 globalThis.matchMedia ??= ((query: string) => ({
   matches: false,
   media: query,
