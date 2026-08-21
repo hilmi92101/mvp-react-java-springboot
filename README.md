@@ -36,7 +36,7 @@ apps/
 infra/
   db/     the one-shot script that creates the database
 docs/
-  architecture/     how the Docker flow works and why
+  architecture/     how the Docker flow works and why, plus the knowledge graph
   features/         what each app does
   troubleshooting/  the traps, with symptoms
 docs-postman/       the Postman collection -- tracked, unlike docs/

@@ -13,3 +13,4 @@ Rules:
 - graphify runs on the host, not in a container -- it is the one exception to the Docker-only rule.
   `uv tool install "graphifyy[sql]"`; the `sql` extra is what lets it see the Flyway migrations.
 - `graphify-out/` is gitignored: it is derived output and records absolute host paths.
+- How this is set up, and how to port it to another project: [docs/architecture/graphify-setup.md](docs/architecture/graphify-setup.md).
